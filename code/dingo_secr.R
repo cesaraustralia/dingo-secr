@@ -11,7 +11,7 @@ covars <-
   rast("spatialData/covs_stack.tif") %>%
   setNames(c("rds_dist", "water_dist", "late_GS", "shdi"))
 
-hab <- rast("C:/Users/aslav/OneDrive/文件/GIS/NVIS_V7_0_AUST_RASTERS_EXT_ALL/NVIS_V7_0_AUST_EXT.gdb")
+hab <- rast("C:/GIS/NVIS_V7_0_AUST_RASTERS_EXT_ALL/NVIS_V7_0_AUST_EXT.gdb")
 bd <-
   read_csv("data/dingo_lookup.csv") %>%
   filter(region == "Mallee") %>%
