@@ -287,7 +287,18 @@ for (i in 1:nrow(all_dat)){
   abline(v = 4 * initialsigma[[1]], lty = 2, col = 'red')
   abline(v = 4 * initialsigma[[2]], lty = 2, col = 'blue')
   
-  surfaceD <- predictDsurface(fits[[bestmod]], se.D = T, cl.D = T)
+  mask_h <-
+    make.mask(traps(BDW_CH),
+              buffer = 20000,
+              spacing = 1000,
+              poly = bd_mask %>% st_as_sf())
+  
+  mask_h <- addCovariates(mask_h, covars[[1]])
+  mask_h <- addCovariates(mask_h, covars[[2]])
+  mask_h <- addCovariates(mask_h, covars[[3]])
+  mask_h <- addCovariates(mask_h, covars[[4]])
+  
+  surfaceD <- predictDsurface(fits[[bestmod]], mask = mask_h, se.D = T, cl.D = T)
   
   pred.r[[i]] <-
     lapply(1:2, function(x)
@@ -295,7 +306,7 @@ for (i in 1:nrow(all_dat)){
         as_tibble() %>%
         bind_cols(covariates(surfaceD[[x]])) %>%
         mutate(Session = c(2023, 2024)[x]) %>%
-        convert_df_to_raster(resolution = c(2500, 2500), crs = crs(hab)) %>%
+        convert_df_to_raster(resolution = c(1000, 1000), crs = crs(hab)) %>%
         setNames(c(2023, 2024)[x])) %>%
     do.call(c, .)
   
@@ -676,7 +687,8 @@ datasets <-
 lapply(1:length(datasets),
        function(r){
          writeRaster(pred.r[[r]],
-                     paste0("output/rasters/", datasets[[r]], ".tiff"))
+                     paste0("output/rasters/", datasets[[r]], ".tiff"),
+                     overwrite = T)
        })
 
 ## more plots!
@@ -788,6 +800,7 @@ set.seed(42)  # For reproducibility
 n_bootstrap <- 10000
 n_datasets <- nrow(data)
 bootstrap_means <- numeric(n_bootstrap)
+bootstrap_mat <- matrix(nrow = n_bootstrap, ncol = n_datasets)
 
 # Create a bootstrap that incorporates the uncertainty from each estimate
 for(i in 1:n_bootstrap) {
@@ -802,6 +815,8 @@ for(i in 1:n_bootstrap) {
   for(j in 1:n_datasets) {
     simulated_estimates[j] <- rnorm(1, mean = data$estimate[j], sd = data$se[j])
   }
+  
+  bootstrap_mat[i,] <- simulated_estimates
   
   # Calculate mean for this bootstrap iteration
   bootstrap_means[i] <- mean(simulated_estimates)
