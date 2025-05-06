@@ -389,7 +389,8 @@ bind_rows(lapply(pred.param,
   theme_cesar() +
   scale_colour_cesar_d() +
   scale_fill_cesar_d() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  drop_grid("x")
 
 cesar_save("plots/BDW_density.png",
            preset = "print")
@@ -408,7 +409,8 @@ bind_rows(pred.param) %>%
   geom_text(aes(label = paste("g:", genotypes),
                 y = .032)) +
   theme_cesar() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  drop_grid("x")
 
 cesar_save("plots/BDW_prob.png",
            preset = "print")
@@ -427,7 +429,8 @@ bind_rows(pred.param) %>%
   geom_text(aes(label = paste("g:", genotypes),
                 y = 16000)) +
   theme_cesar() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  drop_grid("x")
 
 cesar_save("plots/BDW_sigma.png",
            preset = "print")
@@ -477,7 +480,8 @@ bind_rows(lapply(1:length(pred.tot),
   scale_colour_cesar_d() +
   scale_fill_cesar_d() +
   labs(y = "Population size") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  drop_grid("x")
 
 cesar_save("plots/BDW_popsize.png",
            preset = "print")
@@ -776,3 +780,71 @@ cesar_save("plots/BDW_densityrasts.png",
            height = 10,
            width = 10,
            dpi = 300)
+
+# calculate mean across datasets with bootstrap CI estimates
+data <- read_csv("output/BDW_popsize_total.csv") 
+
+set.seed(42)  # For reproducibility
+n_bootstrap <- 10000
+n_datasets <- nrow(data)
+bootstrap_means <- numeric(n_bootstrap)
+
+# Create a bootstrap that incorporates the uncertainty from each estimate
+for(i in 1:n_bootstrap) {
+  # For each bootstrap iteration:
+  # 1. Sample each dataset's estimate incorporating its uncertainty
+  # 2. Calculate the mean across all datasets
+  
+  # Initialize vector to store simulated estimates for this bootstrap iteration
+  simulated_estimates <- numeric(n_datasets)
+  
+  # For each dataset, draw from a normal distribution centered at estimate with SE as std dev
+  for(j in 1:n_datasets) {
+    simulated_estimates[j] <- rnorm(1, mean = data$estimate[j], sd = data$se[j])
+  }
+  
+  # Calculate mean for this bootstrap iteration
+  bootstrap_means[i] <- mean(simulated_estimates)
+}
+
+# Calculate point estimate (mean of bootstrap distribution)
+mean_estimate <- mean(bootstrap_means)
+
+# Calculate confidence intervals
+bootstrap_ci <- quantile(bootstrap_means, c(0.025, 0.975))
+
+plot_data <-
+  tibble(Dataset = "Bootstrap mean estimate",
+         estimate = mean_estimate,
+         se = (bootstrap_ci[2] - bootstrap_ci[1])/(2*1.96),
+         lcl = bootstrap_ci[1],
+         ucl = bootstrap_ci[2]) %>%
+  bind_rows(data) %>%
+  arrange(Dataset)
+
+plot_data %>%
+  ggplot(aes(x = estimate, y = Dataset)) +
+  geom_point(size = 2) +
+  geom_errorbarh(aes(xmin = lcl, xmax = ucl), height = 0.2) +
+  labs(x = "Population Size", y = "Dataset") +
+  theme_cesar() +
+  theme(axis.text.y = element_text(face = ifelse(plot_data$Dataset == "Bootstrap mean estimate", 
+                                                 "bold", "plain"))) +
+  drop_grid("y")
+
+cesar_save("plots/BDW_popsize_mean.png",
+           width = 10,
+           height = 10,
+           dpi = 300)
+
+ggplot(data.frame(bootstrap_values = bootstrap_means), aes(x = bootstrap_values)) +
+  geom_histogram(bins = 50, fill = galliano, colour = warm_grey) +
+  geom_vline(xintercept = bootstrap_ci[1], colour = rufous, linetype = "dashed", linewidth = 1) +
+  geom_vline(xintercept = bootstrap_ci[2], colour = rufous, linetype = "dashed", linewidth = 1) +
+  geom_vline(xintercept = mean_estimate, colour = rufous, linewidth = 1.5) +
+  labs(x = "Mean Population Size", y = "Frequency") +
+  theme_cesar() +
+  drop_grid("y")
+
+cesar_save("plots/BDW_bootstrap.png",
+           preset = "print")
